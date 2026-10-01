@@ -9,8 +9,9 @@ from discord.ext import commands
 
 DB_PATH = os.getenv("DATABASE_PATH", "whitelist.db")
 API_KEY = os.getenv("API_KEY", "")
-GUILD_ID = os.getenv("DISCORD_GUILD_ID", "1516413516498862221")
-ADMIN_ROLE_ID = os.getenv("1516413666306691082", "1516413666306691082")
+GUILD_ID = os.getenv("DISCORD_GUILD_ID", "1516413516498862221").strip().strip('"').strip("'")
+ADMIN_ROLE_ID = os.getenv("ADMIN_ROLE_ID", "1516413666306691082").strip().strip('"').strip("'")
+ADMIN_USER_ID = os.getenv("ADMIN_USER_ID", "").strip().strip('"').strip("'")
 PORT = int(os.getenv("PORT", "8080"))
 
 
@@ -48,7 +49,13 @@ def valid_id(value):
 
 
 def admin_only(interaction):
-    if interaction.user.guild_permissions.manage_guild:
+    if interaction.guild is None:
+        return False
+    if interaction.user.id == interaction.guild.owner_id:
+        return True
+    if ADMIN_USER_ID and str(interaction.user.id) == ADMIN_USER_ID:
+        return True
+    if interaction.user.guild_permissions.administrator or interaction.user.guild_permissions.manage_guild:
         return True
     return bool(ADMIN_ROLE_ID and any(str(role.id) == ADMIN_ROLE_ID for role in interaction.user.roles))
 
@@ -57,7 +64,8 @@ def admin_command(func):
     @wraps(func)
     async def wrapper(interaction, *args, **kwargs):
         if not admin_only(interaction):
-            await interaction.response.send_message("คำสั่งนี้ใช้ได้เฉพาะแอดมินเท่านั้น", ephemeral=True)
+            print(f"Denied admin command: user={interaction.user.id}, roles={[role.id for role in interaction.user.roles]}, configured_role={ADMIN_ROLE_ID}, configured_user={ADMIN_USER_ID}")
+            await interaction.response.send_message("ไม่มีสิทธิ์ใช้คำสั่งนี้: ตรวจ ADMIN_ROLE_ID หรือ ADMIN_USER_ID ใน Railway Variables", ephemeral=True)
             return
         try:
             await func(interaction, *args, **kwargs)
@@ -78,15 +86,16 @@ async def on_ready():
     if GUILD_ID and GUILD_ID.isdigit():
         guild = discord.Object(id=int(GUILD_ID))
         bot.tree.copy_global_to(guild=guild)
-        await bot.tree.sync(guild=guild)
+        synced = await bot.tree.sync(guild=guild)
+        print(f"Synced {len(synced)} guild commands to {GUILD_ID}")
     else:
-        await bot.tree.sync()
+        synced = await bot.tree.sync()
+        print(f"Synced {len(synced)} global commands")
     print(f"Discord online: {bot.user}")
 
 
 @bot.tree.command(name="map-add", description="เพิ่มหรือแก้ไขแมพ")
 @app_commands.describe(name="ชื่อแมพ", place_id="Roblox Place ID")
-@app_commands.default_permissions(manage_guild=True)
 @admin_command
 async def map_add(interaction, name: str, place_id: str):
     if not name.strip() or len(name) > 80 or not valid_id(place_id):
@@ -97,7 +106,6 @@ async def map_add(interaction, name: str, place_id: str):
 
 
 @bot.tree.command(name="map-list", description="แสดงรายการแมพ")
-@app_commands.default_permissions(manage_guild=True)
 @admin_command
 async def map_list(interaction):
     with db_connection() as db:
@@ -108,7 +116,6 @@ async def map_list(interaction):
 
 @bot.tree.command(name="allow", description="อนุญาต Roblox User ID เข้าแมพ")
 @app_commands.describe(roblox_user_id="Roblox User ID", map="ชื่อแมพ", display_name="ชื่อผู้เล่น (ถ้ามี)")
-@app_commands.default_permissions(manage_guild=True)
 @admin_command
 async def allow(interaction, roblox_user_id: str, map: str, display_name: str = None):
     if not valid_id(roblox_user_id):
@@ -124,7 +131,6 @@ async def allow(interaction, roblox_user_id: str, map: str, display_name: str = 
 
 @bot.tree.command(name="deny", description="ยกเลิกสิทธิ์ User ID ในแมพ")
 @app_commands.describe(roblox_user_id="Roblox User ID", map="ชื่อแมพ")
-@app_commands.default_permissions(manage_guild=True)
 @admin_command
 async def deny(interaction, roblox_user_id: str, map: str):
     with db_connection() as db:
@@ -137,7 +143,6 @@ async def deny(interaction, roblox_user_id: str, map: str):
 
 @bot.tree.command(name="user-remove", description="ลบ User ID จากทุกแมพ")
 @app_commands.describe(roblox_user_id="Roblox User ID")
-@app_commands.default_permissions(manage_guild=True)
 @admin_command
 async def user_remove(interaction, roblox_user_id: str):
     with db_connection() as db:
@@ -146,7 +151,6 @@ async def user_remove(interaction, roblox_user_id: str):
 
 
 @bot.tree.command(name="whitelist-list", description="แสดงรายการ whitelist")
-@app_commands.default_permissions(manage_guild=True)
 @admin_command
 async def whitelist_list(interaction):
     with db_connection() as db:
@@ -191,4 +195,3 @@ if __name__ == "__main__":
     if not os.getenv("DISCORD_TOKEN"):
         raise RuntimeError("ต้องตั้งค่า DISCORD_TOKEN ใน Railway Variables")
     bot.run(os.environ["DISCORD_TOKEN"])
-
