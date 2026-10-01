@@ -11,7 +11,7 @@ DB_PATH = os.getenv("DATABASE_PATH", "whitelist.db")
 API_KEY = os.getenv("API_KEY", "")
 GUILD_ID = os.getenv("DISCORD_GUILD_ID", "1516413516498862221").strip().strip('"').strip("'")
 ADMIN_ROLE_ID = os.getenv("ADMIN_ROLE_ID", "1516413666306691082").strip().strip('"').strip("'")
-ADMIN_USER_ID = os.getenv("ADMIN_USER_ID", "patxez").strip().strip('"').strip("'")
+ADMIN_USER_ID = os.getenv("ADMIN_USER_ID", "").strip().strip('"').strip("'")
 PORT = int(os.getenv("PORT", "8080"))
 
 
