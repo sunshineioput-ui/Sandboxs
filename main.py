@@ -11,7 +11,7 @@ DB_PATH = os.getenv("DATABASE_PATH", "whitelist.db")
 API_KEY = os.getenv("API_KEY", "")
 GUILD_ID = os.getenv("DISCORD_GUILD_ID", "1516413516498862221").strip().strip('"').strip("'")
 ADMIN_ROLE_ID = os.getenv("ADMIN_ROLE_ID", "1516413666306691082").strip().strip('"').strip("'")
-ADMIN_USER_ID = os.getenv("ADMIN_USER_ID", "").strip().strip('"').strip("'")
+ADMIN_USER_ID = os.getenv("ADMIN_USER_ID", "1516413666306691082").strip().strip('"').strip("'")
 PORT = int(os.getenv("PORT", "8080"))
 
 
@@ -48,23 +48,28 @@ def valid_id(value):
     return str(value).isdigit() and 1 <= len(str(value)) <= 20
 
 
-def admin_only(interaction):
+async def admin_only(interaction):
     if interaction.guild is None:
         return False
-    if interaction.user.id == interaction.guild.owner_id:
+    member = interaction.user
+    try:
+        member = await interaction.guild.fetch_member(interaction.user.id)
+    except discord.HTTPException as exc:
+        print(f"Could not fetch member {interaction.user.id}: {exc}")
+    if member.id == interaction.guild.owner_id:
         return True
-    if ADMIN_USER_ID and str(interaction.user.id) == ADMIN_USER_ID:
+    if ADMIN_USER_ID and str(member.id) == ADMIN_USER_ID:
         return True
-    if interaction.user.guild_permissions.administrator or interaction.user.guild_permissions.manage_guild:
+    if member.guild_permissions.administrator or member.guild_permissions.manage_guild:
         return True
-    return bool(ADMIN_ROLE_ID and any(str(role.id) == ADMIN_ROLE_ID for role in interaction.user.roles))
+    return bool(ADMIN_ROLE_ID and any(str(role.id) == ADMIN_ROLE_ID for role in member.roles))
 
 
 def admin_command(func):
     @wraps(func)
     async def wrapper(interaction, *args, **kwargs):
-        if not admin_only(interaction):
-            print(f"Denied admin command: user={interaction.user.id}, roles={[role.id for role in interaction.user.roles]}, configured_role={ADMIN_ROLE_ID}, configured_user={ADMIN_USER_ID}")
+        if not await admin_only(interaction):
+            print(f"Denied admin command: user={interaction.user.id}, roles={[role.id for role in getattr(interaction.user, 'roles', [])]}, configured_role={ADMIN_ROLE_ID}, configured_user={ADMIN_USER_ID}")
             await interaction.response.send_message("ไม่มีสิทธิ์ใช้คำสั่งนี้: ตรวจ ADMIN_ROLE_ID หรือ ADMIN_USER_ID ใน Railway Variables", ephemeral=True)
             return
         try:
