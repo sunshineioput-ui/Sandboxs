@@ -10,7 +10,7 @@ from discord.ext import commands
 DB_PATH = os.getenv("DATABASE_PATH", "whitelist.db")
 API_KEY = os.getenv("API_KEY", "")
 GUILD_ID = os.getenv("DISCORD_GUILD_ID", "1516413516498862221")
-ADMIN_ROLE_ID = os.getenv("ADMIN_ROLE_ID", "1516413666306691082")
+ADMIN_ROLE_ID = os.getenv("1516413666306691082", "1516413666306691082")
 PORT = int(os.getenv("PORT", "8080"))
 
 
